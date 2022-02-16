@@ -53,4 +53,7 @@ if __name__ == '__main__':
     urls = f"https://www.23wx.cc/du/164/{book_id}/"
     loop = asyncio.get_event_loop()
     loop.run_until_complete(run(urls))
+    
+             #loop = asyncio.get_event_loop()
+             #loop.run_until_complete(run(urls))  此两句相关于 asyncio.run(run(urls))
     loop.close()
