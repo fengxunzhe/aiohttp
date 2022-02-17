@@ -40,7 +40,7 @@
             asycio.createtask(fun2(),arvg)
         }
         2、tasks = []
-        tasks01 = {
+        tasks01 = {                                #  一次性加入任务
             task.append(fun())
         }      
         await asyncio.wait(tasks)
