@@ -18,4 +18,19 @@
     
     
 ######  关键字  async代表该函数是协程函数
-                await  后 +  IO操作、task任务   如: await asyncio.wait(tasks)
+                await  后 +  IO操作、task对象、协程对象   如: await asyncio.wait(tasks)
+
+######  协程对象执行流程
+        aync def demo：
+            pass
+         
+        DM = demo()
+        DM得到的是协程对象，并不会去执行函数的内容，通过  asyncio.run(demo()) 函数执行协程流程
+
+###### await 就是等待得到结果后再去执行下面的
+        aync def demo：
+            
+            await other()
+            此处是等待other函数执行完毕后才会去执行下面的other2
+            await other2()
+        
