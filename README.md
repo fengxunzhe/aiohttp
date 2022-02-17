@@ -34,3 +34,15 @@
             此处是等待other函数执行完毕后才会去执行下面的other2
             await other2()
         
+###### task任务的两种方式
+        1、task = {
+            asycio.createtask(fun(),arvg),   #  中途加入单个任务
+            asycio.createtask(fun2(),arvg)
+        }
+        2、tasks = []
+        tasks01 = {
+            task.append(fun())
+        }      
+        await asyncio.wait(tasks)
+        
+        
