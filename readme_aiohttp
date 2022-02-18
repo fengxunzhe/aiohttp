@@ -1,0 +1,478 @@
+来源1:https://cloud.tencent.com/developer/article/1785143?from=article.detail.1796312
+来源2:https://cloud.tencent.com/developer/article/1796312?from=article.detail.1785143
+
+##################################################################################
+aiohttp介绍及安装
+    1.背景介绍
+    2.aiohttp 是什么
+    3.aiohttp 核心功能
+    4.aiohttp 库安装
+aoihttp 业务核心功能
+    1. 发起 get 请求
+    2. 发起 post 请求
+    3. 向 url 中传递参数
+    4. 向目标服务器上传文件
+    5. 设置请求超时
+aoihttp 爬虫核心功能
+    1. 自定义cookie
+    2. 在多个请求之间共享cookie
+    3. 自定义请求头
+    4. SSL验证警告问题
+    5. 代理问题
+aoihttp 连接池
+    1.使用连接器
+    2.限制连接池的容量
+小结
+##################################################################################
+aiohttp介绍及安装
+1.背景介绍
+         在 Python 众多的 HTTP 客户端中，最有名的莫过于 requests、aiohttp 和 httpx。在不借助其他第三方库的情况下，requests 只能发送同步请求；aiohttp 只能发送异步请求；httpx 既能发送同步请求，又能发送异步请求。在并发量大的情况下，如何高效的处理数据，异步是我们的优选，今天我们主要详解的是在生产环境广泛使用的 aiohttp。
+
+2.aiohttp 是什么
+          aiohttp 是一个为 Python 提供异步HTTP 客户端/服务端编程，基于 asyncio(Python用于支持异步编程的标准库)的异步库。
+
+3.aiohttp 核心功能
+        同时支持客户端使用和服务端使用。
+        同时支持服务端 WebSockets 组件和客户端 WebSockets 组件，开箱即用。
+        web 服务器具有中间件，信号组件和可插拔路由的功能。
+        以下的案例都是基于客户端展开，我们在生产中主要是用 aiohttp 来做客户端用。
+4.aiohttp 库安装
+        $ pip install aiohttp
+        对于更快的客户端 API DNS 解析方案，aiodns 是个很好的选择，极力推荐，$ pip install aiodns
+aoihttp 业务核心功能
+1. 发起 get 请求
+
+        # -*- encoding: utf-8 -*-
+
+        import asyncio
+        import aiohttp
+
+
+        async def main():
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://www.baidu.com') as resp:
+                    print(resp.status)
+                    res = await resp.text()
+                    print(res[:100])
+
+
+        if __name__ == '__main__':
+            # 注意:
+            # python3.7+ 支持写法
+            # asyncio.run(main())
+            # python3.6及以下版本写法
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+            
+2. 发起 post 请求
+        # -*- encoding: utf-8 -*-
+        import asyncio
+        import aiohttp
+
+
+        async def post_v1():
+            data = b'\x00Binary-data\x00'  # 未经编码的数据通过bytes数据上传
+            data = 'text'  # 传递文本数据
+            data = {'key': 'value'}  # 传递form表单
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post('http://httpbin.org/post', data=data) as resp:
+                    print(resp.status)
+
+
+        # 复杂的 post 请求
+        async def post_v2():
+            payload = {'key': 'value'}  # 传递 pyload
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post('http://httpbin.org/post', json=payload) as resp:
+                    print(resp.status)
+
+
+        if __name__ == '__main__':
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+ 
+ 
+ 
+ 3. 向 url 中传递参数
+有些场景是需要拼接请求url 在这个时候可以使用本 case 来做处理
+        # -*- encoding: utf-8 -*-
+        import asyncio
+        import aiohttp
+
+
+        async def main():
+            """ 以下三种方式均可以 """
+            params = {'key1': 'value1', 'key2': 'value2'}
+            params = [('key', 'value1'), ('key', 'value2')]
+            params = 'key=value+1'
+            async with aiohttp.ClientSession() as sess:
+                async with sess.get('http://httpbin.org/get', params=params) as resp:
+                    print(resp.status)
+
+
+        if __name__ == '__main__':
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+
+4. 向目标服务器上传文件
+有时候，我们确实是有想服务器传文件的需求，eg:上传回执单；上传图片...... 100张 10000张的量级的时候我们会想用多线程去处理，但量再大 你再使用 多线程+requests 的方式就会发现有大量的报错，若有类似的使用场景，可以用以下 case 处理
+
+        import aiohttp
+
+
+        async def main():
+            """ 传递文件 """
+            files = {'file': open('report.xls', 'rb')}
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post('http://httpbin.org/post', data=files) as resp:
+                    print(resp.status)
+                    print(await resp.text())
+
+
+        async def main2():
+            """ 实例化 FormData 可以指定 filename 和 content_type """
+            data = aiohttp.FormData()
+            data.add_field('file',
+                           open('report.xls', 'rb'),
+                           filename='report.xls',
+                           content_type='application/vnd.ms-excel')
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post('http://httpbin.org/post', data=data) as resp:
+                    print(resp.status)
+                    print(await resp.text())
+
+
+        async def main3():
+            """ 流式上传文件 """
+            async with aiohttp.ClientSession() as sess:
+                with open('report.xls', 'rb') as f:
+                    async with sess.post('http://httpbin.org/post', data=f) as resp:
+                        print(resp.status)
+                        print(await resp.text())
+
+
+        async def main4():
+            """ 因为 content属性是 StreamReader（提供异步迭代器协议），
+            所以可以将 get 和 post 请求链接在一起。python3.6+能使用"""
+            async with aiohttp.ClientSession() as sess:
+                async with sess.get('http://python.org') as resp:
+                    async with sess.post('http://httpbin.org/post', data=resp.content) as r:
+                        print(r.status)
+                        print(await r.text())
+
+
+5. 设置请求超时
+有时候，我们向服务器发送请求，若没有设置超时时间，此请求就会一直阻塞直到系统报错，这对于我们的系统是无法容忍的，所以发请求的时候千万要记得加上超时时间。
+        import aiohttp
+
+        timeout = aiohttp.ClientTimeout(total=60)
+
+
+        async def main():
+            async with aiohttp.ClientSession(timeout=timeout) as sess:
+                async with sess.get('http://httpbin.org/get') as resp:
+                    print(resp.status)
+                    print(await resp.text())
+                    
+aoihttp 爬虫核心功能
+1. 自定义cookie
+        import aiohttp
+        import asyncio
+
+
+        cookies = {'cookies_are': 'working'}
+
+        async def main():
+            async with aiohttp.ClientSession(cookies=cookies) as session:
+                async with session.get('http://httpbin.org/cookies') as resp:
+                    print(resp.status)
+                    print(await resp.text())
+                    assert await resp.json() == {"cookies": {"cookies_are": "working"}}
+
+        if __name__ == "__main__":
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+
+2. 在多个请求之间共享cookie
+        import aiohttp
+        import asyncio
+
+
+        async def main():
+            async with aiohttp.ClientSession() as session:
+                await session.get('http://httpbin.org/cookies/set?my_cookie=my_value')
+                filtered = session.cookie_jar.filter_cookies('http://httpbin.org')
+                print(filtered)
+                assert filtered['my_cookie'].value == 'my_value'
+                async with session.get('http://httpbin.org/cookies') as r:
+                    json_body = await r.json()
+                    print(json_body)
+                    assert json_body['cookies']['my_cookie'] == 'my_value'
+
+
+        if __name__ == "__main__":
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+
+Cookie 的安全性问题:
+默认 ClientSession 使用的是严格模式的 aiohttp.CookieJar. RFC 2109，明确的禁止接受url和ip地址产生的 cookie，只能接受 DNS 解析IP产生的cookie。
+
+可以通过设置 aiohttp.CookieJar 的 unsafe=True 来配置
+
+        jar = aiohttp.CookieJar(unsafe=True)
+        session = aiohttp.ClientSession(cookie_jar=jar)
+        
+3. 自定义请求头
+        import aiohttp
+        import asyncio
+
+
+        async with aiohttp.ClientSession(headers={'User-Agent': 'your agent'
+        "refer":"http://httpbin.org"}) as session:
+            async with session.get('http://httpbin.org/headers') as resp:
+                print(resp.status)
+                print(await resp.text())
+
+4. SSL验证警告问题
+默认情况下，aiohttp对HTTPS协议使用严格检查，如果你不想上传SSL证书，可将ssl设置为False。
+        r = await session.get('https://example.com', ssl=False)
+
+
+5. 代理问题
+# 第一种
+        async with aiohttp.ClientSession() as session:
+            proxy_auth = aiohttp.BasicAuth('user', 'pass')
+            async with session.get("http://python.org", proxy="http://proxy.com", proxy_auth=proxy_auth) as resp:
+                print(resp.status)
+
+        # 第二种
+        session.get("http://python.org", proxy="http://user:pass@some.proxy.com")
+        
+
+aoihttp 连接池
+1.使用连接器
+想要调整请求的传输层你可以为ClientSession及其同类组件传递自定义的连接器。例如:
+        conn = aiohttp.TCPConnector()
+        session = aiohttp.ClientSession(connector=conn)
+
+
+2.限制连接池的容量
+限制同一时间打开的连接数可以传递limit参数:
+        conn = aiohttp.TCPConnector(limit=30)
+        
+这样就将总数限制在30,默认情况下是100.如果你不想有限制，传递0即可:
+        conn = aiohttp.TCPConnector(limit=0)
+        
+        
+
+
+
+
+
+
+1. 上节代码简单解释
+2. aiohttp 性能测试
+3. 解决 aiohttp 不支持 HTTPS 代理
+总结
+
+
+1. 上节代码简单解释
+基于上节给出的代码实例，直接使用代码就可以工作，本节我们注解一下核心代码
+
+        # -*- encoding: utf-8 -*-
+
+        import asyncio
+        import aiohttp
+
+
+        async def main():
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://www.baidu.com') as resp:
+                    print(resp.status)
+                    res = await resp.text()
+                    print(res[:100])
+
+
+        if __name__ == '__main__':
+            # 注意:
+            # python3.7+ 支持写法
+            # asyncio.run(main())
+            # python3.6及以下版本写法
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+
+1.先通过 event_loop = asyncio.get_event_loop() 创建了一个事件循环
+2.通过 asyncio.gather 接受多个 future 或 coro 组成的列表 任务
+3.通过 event_loop.run_until_complete(task) 我们 就开启 事件循环 直到这个任务执行结束。
+4.async with aiohttp.ClientSession() as session: 是创建了一个异步的网络请求的上线文管理具柄
+5.async with session.get('http://www.baidu.com') as resp: 异步请求数据
+6.res = await resp.text() 异步的接收数据
+再解释一下两个关键词
+1.async
+如果一个函数被这个async 关键词修饰 那这个函数就是一个 future object
+2.await
+协程对象执行到这个关键词定义之处就会做挂起操作，原理是与yield /yield from 类似的。
+
+2. aiohttp 性能测试
+使用 aiohttp、requests 作为客户端 模拟多任务请求 做一下两者的性能测试。
+我们的请求地址为: url = "http://www.baidu.com"
+分别模拟请求:
+1.50次调用
+2.300次调用   
+
+
+
+            # -*- encoding: utf-8 -*-
+            # requests 方式
+
+
+            import random
+            import time
+            import datetime
+            import requests
+
+
+            def request_task():
+                res = requests.get(url="http://www.baidu.com",verify=False)
+                print(res.status_code)
+
+
+            def request_main():
+                start = time.time()
+                for _ in range(300):
+                    request_task()
+                end = time.time()
+                print("发送300次，耗时: %s" % (end - start))  # 发送300次，耗时: 7.497658014297485
+
+
+            if __name__ == "__main__":
+                request_main()
+        
+        
+            # -*- encoding: utf-8 -*-
+            # aiohttp 方式
+
+            import aiohttp
+            import time
+            import asyncio
+
+
+            async def aoi_main():
+                async with aiohttp.ClientSession() as session:
+                    async with session.get('http://www.baidu.com') as resp:
+                        print(resp.status)
+
+
+            start = time.time()
+            scrape_index_tasks = [asyncio.ensure_future(aoi_main()) for _ in range(300)]
+            loop = asyncio.get_event_loop()
+            tasks = asyncio.gather(*scrape_index_tasks)
+            loop.run_until_complete(tasks)
+            end = time.time()
+            print("发送300次，耗时: %s" % (end - start))  # 发送300次，耗时: 2.5207901000976562
+            
+
+
+
+
+    我这边测试的最终数据为:
+
+    当请求量为 50 时:
+    requests 方式耗时:0.854 s
+    aiohttp 方式耗时: 0.866 s
+    当请求量为 300 时:
+    requests 方式耗时: 7.497 s
+    aiohttp 方式耗时: 2.520 s
+    通过简单的测试我们可以得出一些结论:
+
+    并不是说使用异步请求就比同步请求性能高
+    在并发任务少的情况下建议使用同步的方式做请求，反之在并发任务量大的情况下建议使用异步的方式做请求。你可能好奇怎么界定什么是大并发任务，什么是小并发任务 这个都是相对的 后期我们专门聊一下这个话题
+    3. 解决 aiohttp 不支持 HTTPS 代理
+    背景:
+    有做过爬虫的同学应该知道，同一个ip大并发量请求同一个域名，还没过多久你的这个ip 就会被查封了，所以我们就需要通过代理服务去做请求。
+
+    aiohttp 做 http 代理
+
+        # -*- encoding: utf-8 -*-
+
+        import aiohttp
+        import time
+        import asyncio
+
+        async def main():
+            async with aiohttp.ClientSession() as session:
+                proxy_auth = aiohttp.BasicAuth('user', 'pass')
+                async with session.get("http://www.hao123.com", proxy="http://www.hao123.com", proxy_auth=proxy_auth) as resp:
+                    print(resp.status)
+
+        if __name__ == '__main__':
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+
+aiohttp 做 http 代理
+
+        # -*- encoding: utf-8 -*-
+
+        import aiohttp
+        import time
+        import asyncio
+
+        async def main():
+            async with aiohttp.ClientSession() as session:
+                proxy_auth = aiohttp.BasicAuth('user', 'pass')
+                async with session.get("http://www.hao123.com", proxy="https://www.hao123.com", proxy_auth=proxy_auth) as resp:
+                    print(resp.status)
+
+        if __name__ == '__main__':
+            event_loop = asyncio.get_event_loop()
+            result = event_loop.run_until_complete(asyncio.gather(main()))
+            event_loop.close()
+我们请求之后会发现报错: ValueError: Only http proxies are supported
+
+查阅 aiohttp 文档 可知：
+aiohttp supports plain HTTP proxies and HTTP proxies that can be upgraded to HTTPS via the HTTP CONNECT method. aiohttp does not support proxies that must be connected to via https://.
+也就是说: aiohttp 支持纯 HTTP 代理和可以通过 HTTP CONNECT 方法升级到 HTTPS 的 HTTP 代理，不支持必须通过 https:// 连接的代理。
+
+网上找了一大圈也没有找到太好的解决方案，查看了源码 找到一个可以解决这个问题的轮子，我贴出来大家可以参考。
+
+解决方式一:
+requests 配合 run_in_executor 来做 这个就不详细展开了 不是我们本节的讨论重点
+解决方式二:
+使用 aiohttp-socks，其中实现的 ProxyConnector 继承了 aiohttp 的 TCPConnector。
+
+            # -*- encoding: utf-8 -*-
+            import asyncio
+            import aiohttp
+            from aiohttp_socks import ProxyConnector
+
+
+            async def fetch(session, url):
+                async with session.get(url) as response:
+                    return await response.text()
+
+
+            async def main(url):
+                connector = ProxyConnector.from_url('https://xxx.xxx.com')
+                async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
+                    html = await fetch(session, url)
+                    # to do list
+                    pass
+
+
+            def execute():
+                urls = ["http://www.hao123.com","http://www.baidu.com"]
+                loop = asyncio.get_event_loop()
+                tasks = [main(url) for url in urls]
+                loop.run_until_complete(asyncio.wait(tasks))
+
+总结
+介绍了asyncio、aiohttp 做请求时候的语法糖
+通过做简单的性能测试，解释了很多人的认知误区，并不是什么场景使用异步都是好的选择，也给出了使用场景的建议
+给出了 ValueError: Only http proxies are supported 的两种可行的解决方案     
